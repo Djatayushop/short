@@ -1,239 +1,421 @@
-import React, { useState, useEffect } from 'react';
-import { Link2, Copy, Trash2, ExternalLink, Check } from 'lucide-react';
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>URL Shortener - sexywhatsappgroup.web.id</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-export default function URLShortener() {
-  const [urls, setUrls] = useState([]);
-  const [longUrl, setLongUrl] = useState('');
-  const [customSlug, setCustomSlug] = useState('');
-  const [copiedId, setCopiedId] = useState(null);
-  const domain = 'sexywhatsappgroup.web.id';
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
 
-  useEffect(() => {
-    loadUrls();
-  }, []);
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
 
-  const loadUrls = async () => {
-    try {
-      const result = await window.storage.list('url:');
-      if (result && result.keys) {
-        const urlPromises = result.keys.map(async (key) => {
-          const data = await window.storage.get(key);
-          return data ? JSON.parse(data.value) : null;
-        });
-        const loadedUrls = (await Promise.all(urlPromises)).filter(Boolean);
-        setUrls(loadedUrls.sort((a, b) => b.created - a.created));
-      }
-    } catch (error) {
-      console.log('No URLs found yet');
-      setUrls([]);
-    }
-  };
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+            padding-top: 40px;
+        }
 
-  const generateSlug = () => {
-    const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let slug = '';
-    for (let i = 0; i < 6; i++) {
-      slug += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return slug;
-  };
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
 
-  const isValidUrl = (string) => {
-    try {
-      new URL(string);
-      return true;
-    } catch (_) {
-      return false;
-    }
-  };
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
 
-  const handleShorten = async () => {
-    if (!longUrl.trim()) {
-      alert('Masukkan URL yang valid');
-      return;
-    }
+        .form-card {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            margin-bottom: 30px;
+        }
 
-    if (!isValidUrl(longUrl)) {
-      alert('Format URL tidak valid. Pastikan dimulai dengan http:// atau https://');
-      return;
-    }
+        .form-group {
+            margin-bottom: 20px;
+        }
 
-    const slug = customSlug.trim() || generateSlug();
-    
-    // Check if slug already exists
-    try {
-      const existing = await window.storage.get(`url:${slug}`);
-      if (existing) {
-        alert('Slug sudah digunakan. Pilih slug lain atau biarkan kosong untuk generate otomatis.');
-        return;
-      }
-    } catch (error) {
-      // Slug doesn't exist, continue
-    }
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #333;
+        }
 
-    const newUrl = {
-      id: slug,
-      longUrl: longUrl,
-      shortUrl: `${domain}/${slug}`,
-      created: Date.now(),
-      clicks: 0
-    };
+        input[type="url"],
+        input[type="text"] {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
 
-    try {
-      await window.storage.set(`url:${slug}`, JSON.stringify(newUrl));
-      setUrls([newUrl, ...urls]);
-      setLongUrl('');
-      setCustomSlug('');
-    } catch (error) {
-      alert('Gagal menyimpan URL: ' + error.message);
-    }
-  };
+        input[type="url"]:focus,
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
 
-  const handleCopy = async (shortUrl, id) => {
-    try {
-      await navigator.clipboard.writeText(`https://${shortUrl}`);
-      setCopiedId(id);
-      setTimeout(() => setCopiedId(null), 2000);
-    } catch (error) {
-      alert('Gagal menyalin ke clipboard');
-    }
-  };
+        .slug-input-group {
+            display: flex;
+            align-items: center;
+        }
 
-  const handleDelete = async (id) => {
-    if (confirm('Hapus URL ini?')) {
-      try {
-        await window.storage.delete(`url:${id}`);
-        setUrls(urls.filter(url => url.id !== id));
-      } catch (error) {
-        alert('Gagal menghapus URL');
-      }
-    }
-  };
+        .slug-prefix {
+            padding: 12px 15px;
+            background: #f5f5f5;
+            border: 2px solid #e0e0e0;
+            border-right: none;
+            border-radius: 10px 0 0 10px;
+            color: #666;
+            white-space: nowrap;
+        }
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-600 via-pink-500 to-red-500 p-4">
-      <div className="max-w-4xl mx-auto">
-        {/* Header */}
-        <div className="text-center mb-8 pt-8">
-          <div className="flex items-center justify-center mb-4">
-            <Link2 className="w-12 h-12 text-white" />
-          </div>
-          <h1 className="text-4xl font-bold text-white mb-2">URL Shortener</h1>
-          <p className="text-white text-opacity-90">{domain}</p>
+        .slug-input-group input {
+            border-radius: 0 10px 10px 0;
+        }
+
+        .hint {
+            font-size: 12px;
+            color: #999;
+            margin-top: 5px;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .url-list {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .url-item {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .url-item:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+
+        .url-short {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: #667eea;
+            margin-bottom: 10px;
+            word-break: break-all;
+        }
+
+        .url-short a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        .url-short a:hover {
+            text-decoration: underline;
+        }
+
+        .url-long {
+            color: #666;
+            font-size: 0.9em;
+            margin-bottom: 10px;
+            word-break: break-all;
+        }
+
+        .url-meta {
+            font-size: 0.8em;
+            color: #999;
+            margin-bottom: 15px;
+        }
+
+        .url-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn-action {
+            padding: 8px 15px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: opacity 0.2s;
+        }
+
+        .btn-copy {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+
+        .btn-delete {
+            background: #ffebee;
+            color: #c62828;
+        }
+
+        .btn-action:hover {
+            opacity: 0.8;
+        }
+
+        .empty-state {
+            background: rgba(255,255,255,0.2);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 60px 20px;
+            text-align: center;
+            color: white;
+        }
+
+        .empty-state svg {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+
+        .footer {
+            text-align: center;
+            color: white;
+            margin-top: 30px;
+            opacity: 0.8;
+        }
+
+        @media (max-width: 600px) {
+            .header h1 {
+                font-size: 2em;
+            }
+
+            .form-card {
+                padding: 20px;
+            }
+
+            .slug-prefix {
+                font-size: 14px;
+                padding: 12px 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔗 URL Shortener</h1>
+            <p>sexywhatsappgroup.web.id</p>
         </div>
 
-        {/* Input Form */}
-        <div className="bg-white rounded-2xl shadow-2xl p-6 mb-6">
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                URL Panjang
-              </label>
-              <input
-                type="url"
-                value={longUrl}
-                onChange={(e) => setLongUrl(e.target.value)}
-                placeholder="https://example.com/very/long/url/here"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
-                onKeyPress={(e) => e.key === 'Enter' && handleShorten()}
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Custom Slug (opsional)
-              </label>
-              <div className="flex items-center">
-                <span className="px-4 py-3 bg-gray-100 border border-r-0 border-gray-300 rounded-l-lg text-gray-600 text-sm">
-                  {domain}/
-                </span>
-                <input
-                  type="text"
-                  value={customSlug}
-                  onChange={(e) => setCustomSlug(e.target.value.replace(/[^a-zA-Z0-9-_]/g, ''))}
-                  placeholder="custom-slug"
-                  className="flex-1 px-4 py-3 border border-gray-300 rounded-r-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
-                  onKeyPress={(e) => e.key === 'Enter' && handleShorten()}
-                />
-              </div>
-              <p className="text-xs text-gray-500 mt-1">Biarkan kosong untuk generate otomatis</p>
+        <div class="form-card">
+            <div class="form-group">
+                <label for="longUrl">URL Panjang</label>
+                <input type="url" id="longUrl" placeholder="https://example.com/very/long/url/here">
             </div>
 
-            <button
-              onClick={handleShorten}
-              className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white py-3 px-6 rounded-lg font-semibold hover:from-purple-700 hover:to-pink-700 transition-all duration-200 shadow-lg hover:shadow-xl"
-            >
-              Perpendek URL
-            </button>
-          </div>
-        </div>
-
-        {/* URL List */}
-        <div className="space-y-3">
-          {urls.length === 0 ? (
-            <div className="bg-white bg-opacity-20 backdrop-blur-sm rounded-xl p-8 text-center text-white">
-              <Link2 className="w-16 h-16 mx-auto mb-4 opacity-50" />
-              <p className="text-lg">Belum ada URL yang diperpendek</p>
-              <p className="text-sm opacity-75 mt-2">Mulai dengan memasukkan URL di atas</p>
-            </div>
-          ) : (
-            urls.map((url) => (
-              <div
-                key={url.id}
-                className="bg-white rounded-xl shadow-lg p-5 hover:shadow-xl transition-shadow duration-200"
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-2">
-                      <a
-                        href={`https://${url.shortUrl}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-lg font-semibold text-purple-600 hover:text-purple-700 flex items-center gap-1 break-all"
-                      >
-                        {url.shortUrl}
-                        <ExternalLink className="w-4 h-4 flex-shrink-0" />
-                      </a>
-                    </div>
-                    <p className="text-sm text-gray-600 break-all mb-2">{url.longUrl}</p>
-                    <p className="text-xs text-gray-400">
-                      Dibuat: {new Date(url.created).toLocaleString('id-ID')}
-                    </p>
-                  </div>
-                  
-                  <div className="flex gap-2 flex-shrink-0">
-                    <button
-                      onClick={() => handleCopy(url.shortUrl, url.id)}
-                      className="p-2 bg-purple-100 text-purple-600 rounded-lg hover:bg-purple-200 transition-colors"
-                      title="Salin URL"
-                    >
-                      {copiedId === url.id ? (
-                        <Check className="w-5 h-5" />
-                      ) : (
-                        <Copy className="w-5 h-5" />
-                      )}
-                    </button>
-                    <button
-                      onClick={() => handleDelete(url.id)}
-                      className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors"
-                      title="Hapus"
-                    >
-                      <Trash2 className="w-5 h-5" />
-                    </button>
-                  </div>
+            <div class="form-group">
+                <label for="customSlug">Custom Slug (opsional)</label>
+                <div class="slug-input-group">
+                    <span class="slug-prefix">sexywhatsappgroup.web.id/</span>
+                    <input type="text" id="customSlug" placeholder="custom-slug">
                 </div>
-              </div>
-            ))
-          )}
+                <div class="hint">Biarkan kosong untuk generate otomatis</div>
+            </div>
+
+            <button class="btn" onclick="shortenUrl()">Perpendek URL</button>
         </div>
 
-        {/* Footer */}
-        <div className="text-center mt-8 pb-8">
-          <p className="text-white text-opacity-75 text-sm">
-            Total URL: {urls.length}
-          </p>
+        <div id="urlList" class="url-list"></div>
+
+        <div class="footer">
+            <p>Total URL: <span id="totalUrls">0</span></p>
         </div>
-      </div>
     </div>
-  );
-}
+
+    <script>
+        const domain = 'sexywhatsappgroup.web.id';
+        let urls = [];
+
+        // Load URLs from localStorage
+        function loadUrls() {
+            const saved = localStorage.getItem('shortenedUrls');
+            urls = saved ? JSON.parse(saved) : [];
+            renderUrls();
+        }
+
+        // Save URLs to localStorage
+        function saveUrls() {
+            localStorage.setItem('shortenedUrls', JSON.stringify(urls));
+        }
+
+        // Generate random slug
+        function generateSlug() {
+            const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+            let slug = '';
+            for (let i = 0; i < 6; i++) {
+                slug += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return slug;
+        }
+
+        // Validate URL
+        function isValidUrl(string) {
+            try {
+                new URL(string);
+                return true;
+            } catch (_) {
+                return false;
+            }
+        }
+
+        // Shorten URL
+        function shortenUrl() {
+            const longUrl = document.getElementById('longUrl').value.trim();
+            const customSlug = document.getElementById('customSlug').value.trim();
+
+            if (!longUrl) {
+                alert('Masukkan URL yang valid');
+                return;
+            }
+
+            if (!isValidUrl(longUrl)) {
+                alert('Format URL tidak valid. Pastikan dimulai dengan http:// atau https://');
+                return;
+            }
+
+            const slug = customSlug || generateSlug();
+
+            // Check if slug already exists
+            if (urls.some(url => url.id === slug)) {
+                alert('Slug sudah digunakan. Pilih slug lain atau biarkan kosong untuk generate otomatis.');
+                return;
+            }
+
+            const newUrl = {
+                id: slug,
+                longUrl: longUrl,
+                shortUrl: `${domain}/${slug}`,
+                created: Date.now()
+            };
+
+            urls.unshift(newUrl);
+            saveUrls();
+            renderUrls();
+
+            // Clear inputs
+            document.getElementById('longUrl').value = '';
+            document.getElementById('customSlug').value = '';
+        }
+
+        // Copy to clipboard
+        function copyUrl(shortUrl) {
+            const fullUrl = `https://${shortUrl}`;
+            navigator.clipboard.writeText(fullUrl).then(() => {
+                alert('URL berhasil disalin!');
+            }).catch(() => {
+                alert('Gagal menyalin URL');
+            });
+        }
+
+        // Delete URL
+        function deleteUrl(id) {
+            if (confirm('Hapus URL ini?')) {
+                urls = urls.filter(url => url.id !== id);
+                saveUrls();
+                renderUrls();
+            }
+        }
+
+        // Render URLs
+        function renderUrls() {
+            const urlList = document.getElementById('urlList');
+            const totalUrls = document.getElementById('totalUrls');
+
+            totalUrls.textContent = urls.length;
+
+            if (urls.length === 0) {
+                urlList.innerHTML = `
+                    <div class="empty-state">
+                        <svg fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M12.586 4.586a2 2 0 112.828 2.828l-3 3a2 2 0 01-2.828 0 1 1 0 00-1.414 1.414 4 4 0 005.656 0l3-3a4 4 0 00-5.656-5.656l-1.5 1.5a1 1 0 101.414 1.414l1.5-1.5zm-5 5a2 2 0 012.828 0 1 1 0 101.414-1.414 4 4 0 00-5.656 0l-3 3a4 4 0 105.656 5.656l1.5-1.5a1 1 0 10-1.414-1.414l-1.5 1.5a2 2 0 11-2.828-2.828l3-3z" clip-rule="evenodd"/>
+                        </svg>
+                        <h2>Belum ada URL yang diperpendek</h2>
+                        <p>Mulai dengan memasukkan URL di atas</p>
+                    </div>
+                `;
+                return;
+            }
+
+            urlList.innerHTML = urls.map(url => `
+                <div class="url-item">
+                    <div class="url-short">
+                        <a href="https://${url.shortUrl}" target="_blank">${url.shortUrl} ↗</a>
+                    </div>
+                    <div class="url-long">${url.longUrl}</div>
+                    <div class="url-meta">Dibuat: ${new Date(url.created).toLocaleString('id-ID')}</div>
+                    <div class="url-actions">
+                        <button class="btn-action btn-copy" onclick="copyUrl('${url.shortUrl}')">📋 Salin</button>
+                        <button class="btn-action btn-delete" onclick="deleteUrl('${url.id}')">🗑️ Hapus</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Allow Enter key to submit
+        document.getElementById('longUrl').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') shortenUrl();
+        });
+
+        document.getElementById('customSlug').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') shortenUrl();
+        });
+
+        // Sanitize custom slug input
+        document.getElementById('customSlug').addEventListener('input', (e) => {
+            e.target.value = e.target.value.replace(/[^a-zA-Z0-9-_]/g, '');
+        });
+
+        // Load URLs on page load
+        loadUrls();
+    </script>
+</body>
+</html>
