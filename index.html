@@ -1,267 +1,323 @@
-import React, { useState } from 'react';
-import { Link2, Loader2, Download, Trash2 } from 'lucide-react';
-
-export default function BulkUrlShortener() {
-  const [urls, setUrls] = useState('');
-  const [results, setResults] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [progress, setProgress] = useState({ current: 0, total: 0 });
-
-  const shortenUrls = async () => {
-    const urlList = urls.split('\n').filter(url => url.trim() !== '');
-    
-    if (urlList.length === 0) {
-      alert('Silakan masukkan URL yang ingin diperpendek');
-      return;
-    }
-
-    setLoading(true);
-    setResults([]);
-    setProgress({ current: 0, total: urlList.length });
-
-    const newResults = [];
-
-    for (let i = 0; i < urlList.length; i++) {
-      const url = urlList[i].trim();
-      setProgress({ current: i + 1, total: urlList.length });
-
-      try {
-        const response = await fetch('https://shortly.streamlab.in/api/shorten', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ url: url })
-        });
-
-        const data = await response.json();
-
-        if (data.shortUrl) {
-          newResults.push({
-            original: url,
-            short: data.shortUrl,
-            status: 'success'
-          });
-        } else {
-          newResults.push({
-            original: url,
-            short: '',
-            status: 'error',
-            error: 'Gagal memperpendek URL'
-          });
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bulk URL Shortener</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .spinner {
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 3px solid white;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
         }
-      } catch (error) {
-        newResults.push({
-          original: url,
-          short: '',
-          status: 'error',
-          error: error.message
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen p-4">
+    <div class="max-w-6xl mx-auto">
+        <div class="bg-white rounded-2xl shadow-2xl overflow-hidden">
+            <!-- Header -->
+            <div class="bg-gradient-to-r from-blue-600 to-indigo-600 p-8 text-white">
+                <div class="flex items-center gap-3 mb-2">
+                    <svg class="w-9 h-9" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+                    </svg>
+                    <h1 class="text-3xl font-bold">Bulk URL Shortener</h1>
+                </div>
+                <p class="text-blue-100">Perpendek banyak URL sekaligus dengan mudah</p>
+            </div>
+
+            <!-- Input Section -->
+            <div class="p-8">
+                <div class="mb-6">
+                    <label class="block text-gray-700 font-semibold mb-3">
+                        Masukkan URL (satu URL per baris):
+                    </label>
+                    <textarea
+                        id="urlInput"
+                        placeholder="https://example.com/very-long-url-1&#x0a;https://example.com/very-long-url-2&#x0a;https://example.com/very-long-url-3"
+                        class="w-full h-48 p-4 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none resize-none font-mono text-sm"
+                    ></textarea>
+                    <p class="text-sm text-gray-500 mt-2">
+                        Total: <span id="urlCount">0</span> URL
+                    </p>
+                </div>
+
+                <div class="flex gap-3">
+                    <button
+                        id="shortenBtn"
+                        class="flex-1 bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                    >
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+                        </svg>
+                        Perpendek Semua URL
+                    </button>
+
+                    <button
+                        id="clearBtn"
+                        class="px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition-colors flex items-center gap-2"
+                    >
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                        </svg>
+                        Bersihkan
+                    </button>
+                </div>
+
+                <!-- Progress Bar -->
+                <div id="progressContainer" class="mt-4 hidden">
+                    <div class="bg-gray-200 rounded-full h-3 overflow-hidden">
+                        <div id="progressBar" class="bg-blue-600 h-full transition-all duration-300" style="width: 0%"></div>
+                    </div>
+                    <p id="progressText" class="text-sm text-gray-600 mt-2 text-center"></p>
+                </div>
+            </div>
+
+            <!-- Results Section -->
+            <div id="resultsSection" class="border-t border-gray-200 p-8 hidden">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-2xl font-bold text-gray-800">Hasil</h2>
+                    <div class="flex gap-2">
+                        <button
+                            id="copyAllBtn"
+                            class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-semibold"
+                        >
+                            Salin Semua Link
+                        </button>
+                        <button
+                            id="downloadBtn"
+                            class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2 text-sm font-semibold"
+                        >
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                            </svg>
+                            Download CSV
+                        </button>
+                    </div>
+                </div>
+
+                <div id="resultsList" class="space-y-3 max-h-96 overflow-y-auto"></div>
+
+                <div id="resultsSummary" class="mt-4 p-4 bg-gray-100 rounded-lg"></div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="text-center mt-6 text-gray-600 text-sm">
+            <p>Menggunakan API dari shortly.streamlab.in</p>
+        </div>
+    </div>
+
+    <script>
+        const urlInput = document.getElementById('urlInput');
+        const urlCount = document.getElementById('urlCount');
+        const shortenBtn = document.getElementById('shortenBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const progressContainer = document.getElementById('progressContainer');
+        const progressBar = document.getElementById('progressBar');
+        const progressText = document.getElementById('progressText');
+        const resultsSection = document.getElementById('resultsSection');
+        const resultsList = document.getElementById('resultsList');
+        const resultsSummary = document.getElementById('resultsSummary');
+        const copyAllBtn = document.getElementById('copyAllBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+
+        let results = [];
+
+        // Update URL count
+        urlInput.addEventListener('input', () => {
+            const urls = urlInput.value.split('\n').filter(u => u.trim());
+            urlCount.textContent = urls.length;
         });
-      }
 
-      setResults([...newResults]);
-      
-      // Delay untuk menghindari rate limiting
-      if (i < urlList.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
-    }
+        // Shorten URLs
+        shortenBtn.addEventListener('click', async () => {
+            const urls = urlInput.value.split('\n').filter(u => u.trim());
+            
+            if (urls.length === 0) {
+                alert('Silakan masukkan URL yang ingin diperpendek');
+                return;
+            }
 
-    setLoading(false);
-  };
+            results = [];
+            resultsList.innerHTML = '';
+            resultsSection.classList.add('hidden');
+            progressContainer.classList.remove('hidden');
+            shortenBtn.disabled = true;
+            urlInput.disabled = true;
 
-  const copyToClipboard = (text) => {
-    navigator.clipboard.writeText(text);
-    alert('Link berhasil disalin!');
-  };
+            for (let i = 0; i < urls.length; i++) {
+                const url = urls[i].trim();
+                const progress = ((i + 1) / urls.length) * 100;
+                progressBar.style.width = `${progress}%`;
+                progressText.textContent = `Memproses ${i + 1} dari ${urls.length} URL...`;
 
-  const copyAllShortLinks = () => {
-    const shortLinks = results
-      .filter(r => r.status === 'success')
-      .map(r => r.short)
-      .join('\n');
-    
-    navigator.clipboard.writeText(shortLinks);
-    alert('Semua link pendek berhasil disalin!');
-  };
+                try {
+                    const response = await fetch('https://shortly.streamlab.in/api/shorten', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ url: url })
+                    });
 
-  const downloadResults = () => {
-    const csv = results.map(r => {
-      if (r.status === 'success') {
-        return `"${r.original}","${r.short}","Berhasil"`;
-      } else {
-        return `"${r.original}","","Gagal: ${r.error}"`;
-      }
-    }).join('\n');
+                    const data = await response.json();
 
-    const header = '"URL Asli","URL Pendek","Status"\n';
-    const blob = new Blob([header + csv], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'shortened-urls.csv';
-    a.click();
-  };
+                    if (data.shortUrl) {
+                        results.push({
+                            original: url,
+                            short: data.shortUrl,
+                            status: 'success'
+                        });
+                    } else {
+                        results.push({
+                            original: url,
+                            short: '',
+                            status: 'error',
+                            error: 'Gagal memperpendek URL'
+                        });
+                    }
+                } catch (error) {
+                    results.push({
+                        original: url,
+                        short: '',
+                        status: 'error',
+                        error: error.message
+                    });
+                }
 
-  const clearAll = () => {
-    setUrls('');
-    setResults([]);
-    setProgress({ current: 0, total: 0 });
-  };
+                displayResults();
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      <div className="max-w-6xl mx-auto">
-        <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
-          {/* Header */}
-          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-8 text-white">
-            <div className="flex items-center gap-3 mb-2">
-              <Link2 size={36} />
-              <h1 className="text-3xl font-bold">Bulk URL Shortener</h1>
-            </div>
-            <p className="text-blue-100">Perpendek banyak URL sekaligus dengan mudah</p>
-          </div>
+                // Delay untuk menghindari rate limiting
+                if (i < urls.length - 1) {
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                }
+            }
 
-          {/* Input Section */}
-          <div className="p-8">
-            <div className="mb-6">
-              <label className="block text-gray-700 font-semibold mb-3">
-                Masukkan URL (satu URL per baris):
-              </label>
-              <textarea
-                value={urls}
-                onChange={(e) => setUrls(e.target.value)}
-                placeholder="https://example.com/very-long-url-1&#x0a;https://example.com/very-long-url-2&#x0a;https://example.com/very-long-url-3"
-                className="w-full h-48 p-4 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none resize-none font-mono text-sm"
-                disabled={loading}
-              />
-              <p className="text-sm text-gray-500 mt-2">
-                Total: {urls.split('\n').filter(u => u.trim()).length} URL
-              </p>
-            </div>
+            progressContainer.classList.add('hidden');
+            shortenBtn.disabled = false;
+            urlInput.disabled = false;
+            resultsSection.classList.remove('hidden');
+        });
 
-            <div className="flex gap-3">
-              <button
-                onClick={shortenUrls}
-                disabled={loading || !urls.trim()}
-                className="flex-1 bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 size={20} className="animate-spin" />
-                    Memproses... ({progress.current}/{progress.total})
-                  </>
-                ) : (
-                  <>
-                    <Link2 size={20} />
-                    Perpendek Semua URL
-                  </>
-                )}
-              </button>
-
-              <button
-                onClick={clearAll}
-                disabled={loading}
-                className="px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-              >
-                <Trash2 size={20} />
-                Bersihkan
-              </button>
-            </div>
-
-            {/* Progress Bar */}
-            {loading && (
-              <div className="mt-4">
-                <div className="bg-gray-200 rounded-full h-3 overflow-hidden">
-                  <div
-                    className="bg-blue-600 h-full transition-all duration-300"
-                    style={{ width: `${(progress.current / progress.total) * 100}%` }}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Results Section */}
-          {results.length > 0 && (
-            <div className="border-t border-gray-200 p-8">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-2xl font-bold text-gray-800">Hasil</h2>
-                <div className="flex gap-2">
-                  <button
-                    onClick={copyAllShortLinks}
-                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-semibold"
-                  >
-                    Salin Semua Link
-                  </button>
-                  <button
-                    onClick={downloadResults}
-                    className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2 text-sm font-semibold"
-                  >
-                    <Download size={16} />
-                    Download CSV
-                  </button>
-                </div>
-              </div>
-
-              <div className="space-y-3 max-h-96 overflow-y-auto">
-                {results.map((result, index) => (
-                  <div
-                    key={index}
-                    className={`p-4 rounded-lg border-2 ${
-                      result.status === 'success'
+        // Display results
+        function displayResults() {
+            resultsList.innerHTML = '';
+            
+            results.forEach((result, index) => {
+                const div = document.createElement('div');
+                div.className = `p-4 rounded-lg border-2 ${
+                    result.status === 'success'
                         ? 'bg-green-50 border-green-200'
                         : 'bg-red-50 border-red-200'
-                    }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm text-gray-600 font-semibold mb-1">URL Asli:</p>
-                        <p className="text-sm text-gray-800 break-all mb-2">{result.original}</p>
-                        
-                        {result.status === 'success' ? (
-                          <>
-                            <p className="text-sm text-gray-600 font-semibold mb-1">URL Pendek:</p>
-                            <div className="flex items-center gap-2">
-                              <a
-                                href={result.short}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-blue-600 hover:text-blue-800 font-mono text-sm break-all"
-                              >
-                                {result.short}
-                              </a>
-                              <button
-                                onClick={() => copyToClipboard(result.short)}
-                                className="px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 whitespace-nowrap"
-                              >
-                                Salin
-                              </button>
+                }`;
+
+                if (result.status === 'success') {
+                    div.innerHTML = `
+                        <div class="flex items-start gap-3">
+                            <div class="flex-1 min-w-0">
+                                <p class="text-sm text-gray-600 font-semibold mb-1">URL Asli:</p>
+                                <p class="text-sm text-gray-800 break-all mb-2">${escapeHtml(result.original)}</p>
+                                <p class="text-sm text-gray-600 font-semibold mb-1">URL Pendek:</p>
+                                <div class="flex items-center gap-2">
+                                    <a href="${escapeHtml(result.short)}" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:text-blue-800 font-mono text-sm break-all">
+                                        ${escapeHtml(result.short)}
+                                    </a>
+                                    <button onclick="copyToClipboard('${escapeHtml(result.short)}')" class="px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 whitespace-nowrap">
+                                        Salin
+                                    </button>
+                                </div>
                             </div>
-                          </>
-                        ) : (
-                          <p className="text-red-600 text-sm">❌ {result.error}</p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                        </div>
+                    `;
+                } else {
+                    div.innerHTML = `
+                        <div class="flex items-start gap-3">
+                            <div class="flex-1 min-w-0">
+                                <p class="text-sm text-gray-600 font-semibold mb-1">URL Asli:</p>
+                                <p class="text-sm text-gray-800 break-all mb-2">${escapeHtml(result.original)}</p>
+                                <p class="text-red-600 text-sm">❌ ${escapeHtml(result.error)}</p>
+                            </div>
+                        </div>
+                    `;
+                }
 
-              <div className="mt-4 p-4 bg-gray-100 rounded-lg">
-                <p className="text-sm text-gray-700">
-                  <strong>Berhasil:</strong> {results.filter(r => r.status === 'success').length} / {results.length} URL
+                resultsList.appendChild(div);
+            });
+
+            const successCount = results.filter(r => r.status === 'success').length;
+            resultsSummary.innerHTML = `
+                <p class="text-sm text-gray-700">
+                    <strong>Berhasil:</strong> ${successCount} / ${results.length} URL
                 </p>
-              </div>
-            </div>
-          )}
-        </div>
+            `;
+        }
 
-        {/* Footer */}
-        <div className="text-center mt-6 text-gray-600 text-sm">
-          <p>Menggunakan API dari shortly.streamlab.in</p>
-        </div>
-      </div>
-    </div>
-  );
-}
+        // Copy to clipboard
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text);
+            alert('Link berhasil disalin!');
+        }
+
+        // Copy all short links
+        copyAllBtn.addEventListener('click', () => {
+            const shortLinks = results
+                .filter(r => r.status === 'success')
+                .map(r => r.short)
+                .join('\n');
+            
+            navigator.clipboard.writeText(shortLinks);
+            alert('Semua link pendek berhasil disalin!');
+        });
+
+        // Download CSV
+        downloadBtn.addEventListener('click', () => {
+            const csv = results.map(r => {
+                if (r.status === 'success') {
+                    return `"${r.original}","${r.short}","Berhasil"`;
+                } else {
+                    return `"${r.original}","","Gagal: ${r.error}"`;
+                }
+            }).join('\n');
+
+            const header = '"URL Asli","URL Pendek","Status"\n';
+            const blob = new Blob([header + csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'shortened-urls.csv';
+            a.click();
+        });
+
+        // Clear all
+        clearBtn.addEventListener('click', () => {
+            urlInput.value = '';
+            urlCount.textContent = '0';
+            results = [];
+            resultsList.innerHTML = '';
+            resultsSection.classList.add('hidden');
+            progressContainer.classList.add('hidden');
+        });
+
+        // Escape HTML
+        function escapeHtml(text) {
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return text.replace(/[&<>"']/g, m => map[m]);
+        }
+    </script>
+</body>
+</html>
