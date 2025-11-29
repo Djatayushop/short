@@ -1,0 +1,239 @@
+import React, { useState, useEffect } from 'react';
+import { Link2, Copy, Trash2, ExternalLink, Check } from 'lucide-react';
+
+export default function URLShortener() {
+  const [urls, setUrls] = useState([]);
+  const [longUrl, setLongUrl] = useState('');
+  const [customSlug, setCustomSlug] = useState('');
+  const [copiedId, setCopiedId] = useState(null);
+  const domain = 'sexywhatsappgroup.web.id';
+
+  useEffect(() => {
+    loadUrls();
+  }, []);
+
+  const loadUrls = async () => {
+    try {
+      const result = await window.storage.list('url:');
+      if (result && result.keys) {
+        const urlPromises = result.keys.map(async (key) => {
+          const data = await window.storage.get(key);
+          return data ? JSON.parse(data.value) : null;
+        });
+        const loadedUrls = (await Promise.all(urlPromises)).filter(Boolean);
+        setUrls(loadedUrls.sort((a, b) => b.created - a.created));
+      }
+    } catch (error) {
+      console.log('No URLs found yet');
+      setUrls([]);
+    }
+  };
+
+  const generateSlug = () => {
+    const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let slug = '';
+    for (let i = 0; i < 6; i++) {
+      slug += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return slug;
+  };
+
+  const isValidUrl = (string) => {
+    try {
+      new URL(string);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  };
+
+  const handleShorten = async () => {
+    if (!longUrl.trim()) {
+      alert('Masukkan URL yang valid');
+      return;
+    }
+
+    if (!isValidUrl(longUrl)) {
+      alert('Format URL tidak valid. Pastikan dimulai dengan http:// atau https://');
+      return;
+    }
+
+    const slug = customSlug.trim() || generateSlug();
+    
+    // Check if slug already exists
+    try {
+      const existing = await window.storage.get(`url:${slug}`);
+      if (existing) {
+        alert('Slug sudah digunakan. Pilih slug lain atau biarkan kosong untuk generate otomatis.');
+        return;
+      }
+    } catch (error) {
+      // Slug doesn't exist, continue
+    }
+
+    const newUrl = {
+      id: slug,
+      longUrl: longUrl,
+      shortUrl: `${domain}/${slug}`,
+      created: Date.now(),
+      clicks: 0
+    };
+
+    try {
+      await window.storage.set(`url:${slug}`, JSON.stringify(newUrl));
+      setUrls([newUrl, ...urls]);
+      setLongUrl('');
+      setCustomSlug('');
+    } catch (error) {
+      alert('Gagal menyimpan URL: ' + error.message);
+    }
+  };
+
+  const handleCopy = async (shortUrl, id) => {
+    try {
+      await navigator.clipboard.writeText(`https://${shortUrl}`);
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch (error) {
+      alert('Gagal menyalin ke clipboard');
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (confirm('Hapus URL ini?')) {
+      try {
+        await window.storage.delete(`url:${id}`);
+        setUrls(urls.filter(url => url.id !== id));
+      } catch (error) {
+        alert('Gagal menghapus URL');
+      }
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-purple-600 via-pink-500 to-red-500 p-4">
+      <div className="max-w-4xl mx-auto">
+        {/* Header */}
+        <div className="text-center mb-8 pt-8">
+          <div className="flex items-center justify-center mb-4">
+            <Link2 className="w-12 h-12 text-white" />
+          </div>
+          <h1 className="text-4xl font-bold text-white mb-2">URL Shortener</h1>
+          <p className="text-white text-opacity-90">{domain}</p>
+        </div>
+
+        {/* Input Form */}
+        <div className="bg-white rounded-2xl shadow-2xl p-6 mb-6">
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                URL Panjang
+              </label>
+              <input
+                type="url"
+                value={longUrl}
+                onChange={(e) => setLongUrl(e.target.value)}
+                placeholder="https://example.com/very/long/url/here"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
+                onKeyPress={(e) => e.key === 'Enter' && handleShorten()}
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Custom Slug (opsional)
+              </label>
+              <div className="flex items-center">
+                <span className="px-4 py-3 bg-gray-100 border border-r-0 border-gray-300 rounded-l-lg text-gray-600 text-sm">
+                  {domain}/
+                </span>
+                <input
+                  type="text"
+                  value={customSlug}
+                  onChange={(e) => setCustomSlug(e.target.value.replace(/[^a-zA-Z0-9-_]/g, ''))}
+                  placeholder="custom-slug"
+                  className="flex-1 px-4 py-3 border border-gray-300 rounded-r-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
+                  onKeyPress={(e) => e.key === 'Enter' && handleShorten()}
+                />
+              </div>
+              <p className="text-xs text-gray-500 mt-1">Biarkan kosong untuk generate otomatis</p>
+            </div>
+
+            <button
+              onClick={handleShorten}
+              className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white py-3 px-6 rounded-lg font-semibold hover:from-purple-700 hover:to-pink-700 transition-all duration-200 shadow-lg hover:shadow-xl"
+            >
+              Perpendek URL
+            </button>
+          </div>
+        </div>
+
+        {/* URL List */}
+        <div className="space-y-3">
+          {urls.length === 0 ? (
+            <div className="bg-white bg-opacity-20 backdrop-blur-sm rounded-xl p-8 text-center text-white">
+              <Link2 className="w-16 h-16 mx-auto mb-4 opacity-50" />
+              <p className="text-lg">Belum ada URL yang diperpendek</p>
+              <p className="text-sm opacity-75 mt-2">Mulai dengan memasukkan URL di atas</p>
+            </div>
+          ) : (
+            urls.map((url) => (
+              <div
+                key={url.id}
+                className="bg-white rounded-xl shadow-lg p-5 hover:shadow-xl transition-shadow duration-200"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-2">
+                      <a
+                        href={`https://${url.shortUrl}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-lg font-semibold text-purple-600 hover:text-purple-700 flex items-center gap-1 break-all"
+                      >
+                        {url.shortUrl}
+                        <ExternalLink className="w-4 h-4 flex-shrink-0" />
+                      </a>
+                    </div>
+                    <p className="text-sm text-gray-600 break-all mb-2">{url.longUrl}</p>
+                    <p className="text-xs text-gray-400">
+                      Dibuat: {new Date(url.created).toLocaleString('id-ID')}
+                    </p>
+                  </div>
+                  
+                  <div className="flex gap-2 flex-shrink-0">
+                    <button
+                      onClick={() => handleCopy(url.shortUrl, url.id)}
+                      className="p-2 bg-purple-100 text-purple-600 rounded-lg hover:bg-purple-200 transition-colors"
+                      title="Salin URL"
+                    >
+                      {copiedId === url.id ? (
+                        <Check className="w-5 h-5" />
+                      ) : (
+                        <Copy className="w-5 h-5" />
+                      )}
+                    </button>
+                    <button
+                      onClick={() => handleDelete(url.id)}
+                      className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors"
+                      title="Hapus"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="text-center mt-8 pb-8">
+          <p className="text-white text-opacity-75 text-sm">
+            Total URL: {urls.length}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
